@@ -26,7 +26,7 @@ class Task(models.Model):
         ("Medium","Medium"),
         ("Low","Low")
     ]
-    completion = [
+    is_done = [
         ("Completed","Completed"),
         ("Pending","Pending")
     ]
@@ -35,7 +35,7 @@ class Task(models.Model):
     title = models.CharField(max_length=100)
     priority = models.CharField(max_length=10, choices=priority)
     description = models.TextField(max_length=500)
-    completion=models.CharField(max_length=20, choices=completion, default="Pending")
+    is_done=models.CharField(max_length=20, choices=is_done, default="Pending")
     
 #Deck
 
