@@ -4,12 +4,12 @@ from .models import SignUp, HomePage, Task, Deck, Flashcard, Timer, Calender
 class SignUpForm(forms.ModelForm):
     class Meta:
         model = SignUp
-        fields = ['first_name','middle_name','last_name','email','password']
+        fields = ['first_name','last_name','email','password']
 
 class HomePageForm(forms.ModelForm):
     class Meta:
         model = HomePage
-        fields = ['user','pal','streaks','last_study_date','xp']
+        fields = ['user','pal','streak','last_study_date','xp']
 
 class TaskForm(forms.ModelForm):
     class Meta:
