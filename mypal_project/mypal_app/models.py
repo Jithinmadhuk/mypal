@@ -23,7 +23,7 @@ class HomePage(models.Model):
 class Task(models.Model):
     priority = [
         ("High","High"),
-        ("Medium","Medium"),
+        ("Medium","Medium"), 
         ("Low","Low")
     ]
     is_done = [
