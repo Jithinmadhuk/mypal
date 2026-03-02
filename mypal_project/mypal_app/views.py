@@ -81,5 +81,5 @@ def CalenderView(request):
             return redirect("calender")
     else:
         form = CalenderForm()
-    calenders = Calender.objects.all()
-    return render(request, "calender.html", {"form": form, "calenders": calenders})
+    events = Calender.objects.all()
+    return render(request, "calender.html", {"form": form, "events": events})
