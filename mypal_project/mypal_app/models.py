@@ -8,7 +8,7 @@ class SignUp(models.Model):
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=30)
 
-#home-Page table
+#home table
 
 class HomePage(models.Model):
     user = models.CharField(max_length=30)
@@ -36,7 +36,7 @@ class Task(models.Model):
     description = models.TextField(max_length=500)
     is_done=models.CharField(max_length=20, choices=is_done, default="Pending")
     
-#Deck
+#Deck table
 
 class Deck(models.Model):
     user = models.ForeignKey(HomePage, on_delete=models.CASCADE)
