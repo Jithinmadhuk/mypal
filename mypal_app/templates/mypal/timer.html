@@ -1,0 +1,172 @@
+{% extends 'mypal/base.html' %}
+{% block title %}Timer{% endblock %}
+
+{% block extra_css %}
+<style>
+  .timer-layout { display:grid; grid-template-columns:1fr 320px; gap:24px; }
+  .timer-card { background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:48px 32px; text-align:center; position:relative; overflow:hidden; }
+  .timer-card::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 100%, #5eead411 0%, transparent 70%); pointer-events:none; }
+  .timer-mode { font-size:12px; font-weight:800; color:var(--mint); text-transform:uppercase; letter-spacing:2px; margin-bottom:24px; }
+  .timer-circle { width:220px; height:220px; position:relative; margin:0 auto 32px; }
+  .timer-circle svg { transform:rotate(-90deg); }
+  .circle-track { fill:none; stroke:var(--surface2); stroke-width:8; }
+  .circle-progress { fill:none; stroke:var(--mint); stroke-width:8; stroke-linecap:round; transition:stroke-dashoffset .5s linear; }
+  .timer-overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .timer-digits { font-family:'Fredoka One',cursive; font-size:54px; line-height:1; }
+  .timer-sub { font-size:12px; color:var(--muted); font-weight:700; margin-top:4px; }
+  .timer-controls { display:flex; gap:12px; justify-content:center; margin-bottom:24px; }
+  .ctrl-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text); width:56px; height:56px; border-radius:50%; cursor:pointer; font-size:20px; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+  .ctrl-btn.play { background:var(--mint); color:#0e1117; border-color:var(--mint); width:68px; height:68px; font-size:22px; }
+  .ctrl-btn:hover { transform:scale(1.05); }
+  .session-dots { display:flex; gap:8px; justify-content:center; }
+  .dot { width:12px; height:12px; border-radius:50%; background:var(--surface2); border:2px solid var(--border); transition:all .3s; }
+  .dot.done { background:var(--mint); border-color:var(--mint); }
+  .setting-row { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px 20px; margin-bottom:12px; }
+  .setting-label { font-size:12px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .setting-value { font-family:'Fredoka One',cursive; font-size:26px; color:var(--peach); margin-bottom:6px; }
+  input[type=range] { width:100%; appearance:none; height:6px; background:var(--surface2); border-radius:3px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { appearance:none; width:18px; height:18px; border-radius:50%; background:var(--peach); cursor:pointer; }
+  @media(max-width:768px) { .timer-layout{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-content">
+  <div class="page-title">⏱ Pomodoro Timer</div>
+  <div class="timer-layout">
+    <!-- TIMER DISPLAY -->
+    <div class="timer-card">
+      <div class="timer-mode" id="mode-label">FOCUS TIME</div>
+      <div class="timer-circle">
+        <svg width="220" height="220" viewBox="0 0 220 220">
+          <circle class="circle-track" cx="110" cy="110" r="97"/>
+          <circle class="circle-progress" id="circle-progress" cx="110" cy="110" r="97"
+            stroke-dasharray="609.7" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-overlay">
+          <div class="timer-digits" id="timer-digits">25:00</div>
+          <div class="timer-sub" id="timer-sub">Ready to focus</div>
+        </div>
+      </div>
+      <div class="timer-controls">
+        <button class="ctrl-btn" onclick="resetTimer()" title="Reset">↺</button>
+        <button class="ctrl-btn play" id="play-btn" onclick="toggleTimer()">▶</button>
+        <button class="ctrl-btn" onclick="skipSession()" title="Skip">⏭</button>
+      </div>
+      <div class="session-dots" id="session-dots">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+      <div style="margin-top:12px;font-size:13px;color:var(--muted);font-weight:700;">
+        Session <span id="session-num">1</span> of 4
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div>
+      <div style="font-family:'Fredoka One',cursive;font-size:20px;margin-bottom:16px;">⚙️ Settings</div>
+      <div class="setting-row">
+        <div class="setting-label">Focus Duration</div>
+        <div class="setting-value" id="focus-val">25 min</div>
+        <input type="range" min="5" max="60" step="5" value="25" id="focus-slider" oninput="updateSetting('focus',this.value)">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">Short Break</div>
+        <div class="setting-value" id="break-val" style="color:var(--sky)">5 min</div>
+        <input type="range" min="1" max="15" step="1" value="5" id="break-slider" oninput="updateSetting('break',this.value)">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">Long Break</div>
+        <div class="setting-value" id="long-val" style="color:var(--mint)">15 min</div>
+        <input type="range" min="10" max="30" step="5" value="15" id="long-slider" oninput="updateSetting('long',this.value)">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">Today's Sessions</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+          <div style="font-family:'Fredoka One',cursive;font-size:40px;color:var(--mint);" id="today-sessions">{{ sessions_today }}</div>
+          <div style="font-size:13px;color:var(--muted);font-weight:600;">sessions<br>completed</div>
+        </div>
+      </div>
+
+      <!-- Hidden form to submit completed session to Django -->
+      <form id="complete-form" method="post" action="{% url 'complete_session' %}" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="minutes" id="session-minutes" value="25">
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let t = { focus:25, breakT:5, longBreak:15, mode:'focus', running:false, remaining:25*60, total:25*60, session:0, interval:null };
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+function updateDisplay(){
+  const m = Math.floor(t.remaining/60), s = t.remaining%60;
+  document.getElementById('timer-digits').textContent = pad(m)+':'+pad(s);
+  const pct = t.remaining / t.total;
+  document.getElementById('circle-progress').style.strokeDashoffset = 609.7 * pct;
+  const colors = { focus:'#5eead4', break:'#38bdf8', long:'#fb923c' };
+  document.getElementById('circle-progress').style.stroke = colors[t.mode];
+  document.getElementById('mode-label').textContent = t.mode==='focus'?'FOCUS TIME': t.mode==='break'?'SHORT BREAK':'LONG BREAK';
+  document.getElementById('timer-sub').textContent = t.running?(t.mode==='focus'?'Stay focused!':'Rest up!'):'Ready';
+  document.getElementById('play-btn').textContent = t.running ? '⏸' : '▶';
+  document.title = `${pad(m)}:${pad(s)} – Mypal`;
+}
+
+function toggleTimer(){
+  if(t.running){ clearInterval(t.interval); t.running=false; }
+  else {
+    t.running=true;
+    t.interval=setInterval(()=>{
+      t.remaining--;
+      if(t.remaining<=0) completeSession();
+      updateDisplay();
+    },1000);
+  }
+  updateDisplay();
+}
+
+function completeSession(){
+  clearInterval(t.interval); t.running=false;
+  if(t.mode==='focus'){
+    // Submit to Django to save session + award XP
+    document.getElementById('session-minutes').value = t.focus;
+    document.getElementById('complete-form').submit();
+    t.session++;
+    const todayEl = document.getElementById('today-sessions');
+    todayEl.textContent = parseInt(todayEl.textContent)+1;
+    updateSessionDots();
+    t.mode = (t.session%4===0) ? 'long' : 'break';
+    t.remaining = t.mode==='long' ? t.longBreak*60 : t.breakT*60;
+    t.total = t.remaining;
+    document.getElementById('session-num').textContent = (t.session%4)+1||1;
+  } else {
+    t.mode='focus'; t.remaining=t.focus*60; t.total=t.remaining;
+  }
+  updateDisplay();
+}
+
+function resetTimer(){ clearInterval(t.interval); t.running=false; t.mode='focus'; t.remaining=t.focus*60; t.total=t.remaining; updateDisplay(); }
+function skipSession(){ clearInterval(t.interval); t.running=false; t.mode=t.mode==='focus'?'break':'focus'; t.remaining=t.mode==='focus'?t.focus*60:t.breakT*60; t.total=t.remaining; updateDisplay(); }
+
+function updateSetting(type,val){
+  if(type==='focus'){ t.focus=parseInt(val); document.getElementById('focus-val').textContent=val+' min'; if(!t.running&&t.mode==='focus'){t.remaining=t.focus*60;t.total=t.remaining;} }
+  if(type==='break'){ t.breakT=parseInt(val); document.getElementById('break-val').textContent=val+' min'; }
+  if(type==='long'){ t.longBreak=parseInt(val); document.getElementById('long-val').textContent=val+' min'; }
+  updateDisplay();
+}
+
+function updateSessionDots(){
+  const dots = document.querySelectorAll('.dot');
+  dots.forEach((d,i)=>{ d.classList.toggle('done', i < t.session%4); });
+}
+
+// Space bar shortcut
+document.addEventListener('keydown', e => { if(e.code==='Space'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='BUTTON'){e.preventDefault();toggleTimer();} });
+
+updateDisplay();
+</script>
+{% endblock %}

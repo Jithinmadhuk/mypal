@@ -1,0 +1,245 @@
+{% extends 'mypal/base.html' %}
+{% block title %}Flashcards{% endblock %}
+
+{% block extra_css %}
+<style>
+  .fc-layout { display:grid; grid-template-columns:280px 1fr; gap:24px; align-items:start; }
+  .deck-item { background:var(--surface); border:2px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:10px; cursor:pointer; transition:all .2s; text-decoration:none; display:block; }
+  .deck-item:hover,.deck-item.active { border-color:var(--lavender); background:var(--surface2); }
+  .deck-name { font-weight:800; font-size:15px; color:var(--text); margin-bottom:3px; }
+  .deck-meta { font-size:12px; color:var(--muted); }
+  .deck-bar { height:4px; background:var(--surface2); border-radius:2px; margin-top:8px; }
+  .deck-bar-fill { height:100%; border-radius:2px; background:var(--lavender); }
+  .deck-actions { display:flex; gap:6px; margin-top:8px; }
+
+  /* ADD DECK MODAL TRIGGER */
+  .add-deck-btn { width:100%; background:none; border:1px dashed var(--border); color:var(--muted); font-family:'Nunito',sans-serif; font-weight:700; font-size:13px; padding:12px; border-radius:12px; cursor:pointer; transition:all .2s; margin-bottom:12px; }
+  .add-deck-btn:hover { border-color:var(--lavender); color:var(--lavender); }
+
+  /* FLASHCARD */
+  .flashcard-wrapper { perspective:1000px; height:260px; cursor:pointer; margin-bottom:20px; }
+  .flashcard { width:100%; height:100%; position:relative; transform-style:preserve-3d; transition:transform .5s cubic-bezier(.4,0,.2,1); border-radius:20px; }
+  .flashcard.flipped { transform:rotateY(180deg); }
+  .card-face { position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; border-radius:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; border:1px solid var(--border); }
+  .card-front { background:linear-gradient(135deg,#1a1f3a,#1e2738); }
+  .card-back { background:linear-gradient(135deg,#1a2e1e,#1e3828); transform:rotateY(180deg); }
+  .face-label { font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:2px; margin-bottom:14px; }
+  .face-text { font-size:20px; font-weight:700; line-height:1.4; }
+  .card-front .face-text { color:var(--lavender); }
+  .card-back .face-text { color:var(--mint); }
+  .tap-hint { font-size:12px; color:var(--muted); margin-top:14px; }
+  .fc-controls { display:flex; justify-content:center; align-items:center; gap:16px; margin-bottom:16px; }
+  .fc-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:'Nunito',sans-serif; font-weight:800; font-size:14px; padding:12px 24px; border-radius:12px; cursor:pointer; transition:all .2s; }
+  .fc-btn.wrong:hover { border-color:var(--rose); color:var(--rose); }
+  .fc-btn.right:hover { border-color:var(--mint); color:var(--mint); }
+  .fc-counter { font-family:'Fredoka One',cursive; font-size:18px; color:var(--muted); min-width:80px; text-align:center; }
+  .mastery-bar { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 16px; margin-bottom:16px; }
+  .mastery-label { display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:6px; }
+  .m-bar { height:8px; background:var(--surface2); border-radius:4px; overflow:hidden; }
+  .m-bar-fill { height:100%; background:linear-gradient(90deg,var(--lavender),var(--mint)); border-radius:4px; }
+
+  /* CARD LIST */
+  .card-list-item { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:12px; }
+  .card-list-text { flex:1; font-size:13px; font-weight:600; }
+  .card-list-answer { font-size:12px; color:var(--muted); margin-top:2px; }
+  .mastered-badge { font-size:11px; font-weight:800; color:var(--mint); background:#5eead422; padding:3px 8px; border-radius:20px; }
+
+  /* EDIT MODAL */
+  .modal input { margin-bottom:12px; }
+
+  @media(max-width:768px) { .fc-layout{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-content">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+    <div class="page-title">🃏 Flashcards</div>
+    <button class="btn-primary" onclick="document.getElementById('deck-modal').classList.add('open')">+ New Deck</button>
+  </div>
+
+  <div class="fc-layout">
+    <!-- DECK LIST -->
+    <div>
+      <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Your Decks</div>
+      {% for deck in decks %}
+      <div class="deck-item {% if active_deck and active_deck.id == deck.id %}active{% endif %}">
+        <a href="{% url 'study_deck' deck.id %}" style="text-decoration:none;">
+          <div class="deck-name">{{ deck.name }}</div>
+          <div class="deck-meta">{{ deck.subject }} · {{ deck.cards.count }} card{{ deck.cards.count|pluralize }}</div>
+          <div class="deck-bar"><div class="deck-bar-fill" style="width:{{ deck.get_mastery_percent }}%"></div></div>
+        </a>
+        <div class="deck-actions">
+          <button class="btn-edit" onclick="openEditDeck({{ deck.id }}, '{{ deck.name }}', '{{ deck.subject }}')">✏️ Edit</button>
+          <form method="post" action="{% url 'delete_deck' deck.id %}" style="display:inline;" onsubmit="return confirm('Delete this deck and all its cards?')">
+            {% csrf_token %}<button type="submit" class="btn-danger">🗑 Delete</button>
+          </form>
+        </div>
+      </div>
+      {% empty %}
+      <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px;border:1px dashed var(--border);border-radius:12px;">No decks yet — create one!</div>
+      {% endfor %}
+
+      {% if active_deck %}
+      <!-- ADD CARD FORM -->
+      <div style="margin-top:16px;background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:14px;">
+        <div style="font-weight:800;font-size:13px;color:var(--muted);margin-bottom:10px;">📝 Add Card to "{{ active_deck.name }}"</div>
+        <form method="post" action="{% url 'add_card' active_deck.id %}">
+          {% csrf_token %}
+          <input type="text" name="front" class="form-input" placeholder="Front (Question)" required>
+          <input type="text" name="back" class="form-input" placeholder="Back (Answer)" required>
+          <button type="submit" class="btn-primary" style="width:100%;">Add Card ✨</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- STUDY AREA -->
+    <div>
+      {% if active_deck %}
+        {% if current_card %}
+          <!-- MASTERY BAR -->
+          <div class="mastery-bar">
+            <div class="mastery-label"><span>Mastery Progress</span><span>{{ mastery_percent }}%</span></div>
+            <div class="m-bar"><div class="m-bar-fill" style="width:{{ mastery_percent }}%"></div></div>
+          </div>
+
+          <!-- FLASHCARD -->
+          <div class="flashcard-wrapper" onclick="flipCard()">
+            <div class="flashcard" id="flashcard">
+              <div class="card-face card-front">
+                <div class="face-label">Question</div>
+                <div class="face-text">{{ current_card.front }}</div>
+                <div class="tap-hint">Tap to reveal answer →</div>
+              </div>
+              <div class="card-face card-back">
+                <div class="face-label">Answer</div>
+                <div class="face-text">{{ current_card.back }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CONTROLS -->
+          <div class="fc-controls">
+            <form method="post" action="{% url 'mark_card' current_card.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="result" value="wrong">
+              <input type="hidden" name="next_index" value="{{ next_index }}">
+              <button type="submit" class="fc-btn wrong">✗ Didn't Know</button>
+            </form>
+            <div class="fc-counter">{{ card_index|add:1 }} / {{ total_cards }}</div>
+            <form method="post" action="{% url 'mark_card' current_card.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="result" value="correct">
+              <input type="hidden" name="next_index" value="{{ next_index }}">
+              <button type="submit" class="fc-btn right">✓ Got It!</button>
+            </form>
+          </div>
+
+          <!-- CARD LIST WITH EDIT/DELETE -->
+          <div style="margin-top:20px;">
+            <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">All Cards in Deck</div>
+            {% for card in cards %}
+            <div class="card-list-item">
+              <div style="flex:1;">
+                <div class="card-list-text">{{ card.front }}</div>
+                <div class="card-list-answer">→ {{ card.back }}</div>
+              </div>
+              {% if card.is_mastered %}<div class="mastered-badge">✓ Mastered</div>{% endif %}
+              <button class="btn-edit" onclick="openEditCard({{ card.id }}, '{{ card.front|escapejs }}', '{{ card.back|escapejs }}')">✏️</button>
+              <form method="post" action="{% url 'delete_card' card.id %}" style="display:inline;" onsubmit="return confirm('Delete this card?')">
+                {% csrf_token %}<button type="submit" class="btn-danger">🗑</button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+
+        {% else %}
+          <div style="text-align:center;padding:60px 20px;background:var(--surface);border:1px solid var(--border);border-radius:20px;">
+            <div style="font-size:40px;margin-bottom:12px;">📝</div>
+            <div style="font-size:16px;font-weight:700;margin-bottom:8px;">This deck is empty!</div>
+            <div style="font-size:13px;color:var(--muted);">Add cards using the form on the left.</div>
+          </div>
+        {% endif %}
+      {% else %}
+        <div style="text-align:center;padding:80px 20px;background:var(--surface);border:1px solid var(--border);border-radius:20px;">
+          <div style="font-size:48px;margin-bottom:16px;">🃏</div>
+          <div style="font-size:18px;font-weight:700;">Select a deck to start studying</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ADD DECK MODAL -->
+<div class="modal-overlay" id="deck-modal">
+  <div class="modal">
+    <div class="modal-title">🃏 Create New Deck</div>
+    <form method="post" action="{% url 'add_deck' %}">
+      {% csrf_token %}
+      <input type="text" name="name" class="form-input" placeholder="Deck name (e.g. Biology Chapter 3)" required>
+      <input type="text" name="subject" class="form-input" placeholder="Subject (e.g. Science)">
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Create Deck</button>
+        <button type="button" class="btn-danger" onclick="document.getElementById('deck-modal').classList.remove('open')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT DECK MODAL -->
+<div class="modal-overlay" id="edit-deck-modal">
+  <div class="modal">
+    <div class="modal-title">✏️ Edit Deck</div>
+    <form method="post" id="edit-deck-form">
+      {% csrf_token %}
+      <input type="text" name="name" id="edit-deck-name" class="form-input" placeholder="Deck name" required>
+      <input type="text" name="subject" id="edit-deck-subject" class="form-input" placeholder="Subject">
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Save Changes</button>
+        <button type="button" class="btn-danger" onclick="document.getElementById('edit-deck-modal').classList.remove('open')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT CARD MODAL -->
+<div class="modal-overlay" id="edit-card-modal">
+  <div class="modal">
+    <div class="modal-title">✏️ Edit Card</div>
+    <form method="post" id="edit-card-form">
+      {% csrf_token %}
+      <input type="text" name="front" id="edit-card-front" class="form-input" placeholder="Front (Question)" required>
+      <input type="text" name="back" id="edit-card-back" class="form-input" placeholder="Back (Answer)" required>
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Save Changes</button>
+        <button type="button" class="btn-danger" onclick="document.getElementById('edit-card-modal').classList.remove('open')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function flipCard(){
+  document.getElementById('flashcard').classList.toggle('flipped');
+}
+function openEditDeck(id, name, subject){
+  document.getElementById('edit-deck-form').action = '/flashcards/deck/'+id+'/edit/';
+  document.getElementById('edit-deck-name').value = name;
+  document.getElementById('edit-deck-subject').value = subject;
+  document.getElementById('edit-deck-modal').classList.add('open');
+}
+function openEditCard(id, front, back){
+  document.getElementById('edit-card-form').action = '/flashcards/card/'+id+'/edit/';
+  document.getElementById('edit-card-front').value = front;
+  document.getElementById('edit-card-back').value = back;
+  document.getElementById('edit-card-modal').classList.add('open');
+}
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); });
+});
+</script>
+{% endblock %}

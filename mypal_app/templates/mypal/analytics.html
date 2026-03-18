@@ -1,0 +1,141 @@
+{% extends 'mypal/base.html' %}
+{% block title %}Analytics{% endblock %}
+
+{% block extra_css %}
+<style>
+  .analytics-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .full { grid-column:1/-1; }
+  .bar-chart { display:flex; align-items:flex-end; gap:8px; height:160px; padding:0 4px; }
+  .bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .bar { width:100%; border-radius:6px 6px 0 0; background:linear-gradient(180deg,var(--lavender),#a78bfa88); min-height:4px; position:relative; transition:height .6s; }
+  .bar:hover { background:linear-gradient(180deg,var(--mint),#5eead488); }
+  .bar-label { font-size:11px; color:var(--muted); font-weight:700; }
+  .bar-val { font-size:10px; color:var(--muted); position:absolute; top:-20px; left:50%; transform:translateX(-50%); white-space:nowrap; }
+  .ring-wrap { position:relative; display:inline-flex; }
+  .ring-wrap svg { transform:rotate(-90deg); }
+  .ring-text { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ring-pct { font-family:'Fredoka One',cursive; font-size:28px; color:var(--mint); }
+  .ring-sub { font-size:11px; color:var(--muted); font-weight:700; }
+  .pie-wrap { display:flex; align-items:center; gap:20px; justify-content:center; padding:10px 0; }
+  .legend { display:flex; flex-direction:column; gap:10px; }
+  .legend-item { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; }
+  .legend-dot { width:12px; height:12px; border-radius:3px; }
+  @media(max-width:768px) { .analytics-grid{grid-template-columns:1fr;} .full{grid-column:1;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-content">
+  <div class="page-title">📊 Study Analytics</div>
+  <div class="analytics-grid">
+
+    <!-- WEEKLY BAR CHART -->
+    <div class="card full">
+      <div class="card-title">📈 Study Time This Week (minutes)</div>
+      <div class="bar-chart" id="bar-chart"></div>
+    </div>
+
+    <!-- TASK COMPLETION RING -->
+    <div class="card">
+      <div class="card-title">✅ Task Completion</div>
+      <div style="display:flex;align-items:center;gap:20px;justify-content:center;padding:16px 0;">
+        <div class="ring-wrap">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <circle cx="70" cy="70" r="58" fill="none" stroke="var(--surface2)" stroke-width="12"/>
+            <circle cx="70" cy="70" r="58" fill="none" stroke="var(--mint)" stroke-width="12" stroke-linecap="round"
+              stroke-dasharray="364" stroke-dashoffset="{{ completion_offset }}" transform="rotate(-90 70 70)"/>
+          </svg>
+          <div class="ring-text"><div class="ring-pct">{{ completion_pct }}%</div><div class="ring-sub">Done</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div><div style="font-family:'Fredoka One',cursive;font-size:28px;color:var(--mint);">{{ done_tasks }}</div><div style="font-size:12px;color:var(--muted);font-weight:700;">Completed</div></div>
+          <div><div style="font-family:'Fredoka One',cursive;font-size:28px;color:var(--peach);">{{ remaining_tasks }}</div><div style="font-size:12px;color:var(--muted);font-weight:700;">Remaining</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLASHCARD MASTERY PIE -->
+    <div class="card">
+      <div class="card-title">🃏 Flashcard Mastery</div>
+      <div class="pie-wrap">
+        <canvas id="pieCanvas" width="120" height="120"></canvas>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--mint)"></div>Mastered <span style="color:var(--muted);font-size:12px;margin-left:4px;">{{ mastery_pct }}%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--lavender)"></div>Learning <span style="color:var(--muted);font-size:12px;margin-left:4px;">{{ learning_pct }}%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STREAK & XP -->
+    <div class="card">
+      <div class="card-title">🔥 Streak & XP</div>
+      <div style="display:flex;flex-direction:column;gap:16px;padding:8px 0;">
+        <div>
+          <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Current Streak</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:48px;color:var(--peach);">{{ profile.streak }} 🔥</div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Total XP Earned</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:48px;color:var(--lavender);">{{ profile.xp }} ✨</div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Level</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:28px;color:var(--sky);">{{ level }} · {{ level_title }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOTAL STUDY TIME -->
+    <div class="card">
+      <div class="card-title">⏱ Total Study Time</div>
+      <div style="display:flex;gap:16px;justify-content:center;align-items:center;padding:20px 0;">
+        <div style="text-align:center;">
+          <div style="font-family:'Fredoka One',cursive;font-size:48px;color:var(--sky);">{{ total_hours }}</div>
+          <div style="font-size:12px;font-weight:800;color:var(--muted);">HOURS</div>
+        </div>
+        <div style="font-size:32px;color:var(--muted);">:</div>
+        <div style="text-align:center;">
+          <div style="font-family:'Fredoka One',cursive;font-size:48px;color:var(--sky);">{{ remaining_mins }}</div>
+          <div style="font-size:12px;font-weight:800;color:var(--muted);">MINUTES</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Bar chart
+const weekData = {{ week_data|safe }};
+const maxMins = Math.max(...weekData.map(d=>d.minutes), 1);
+document.getElementById('bar-chart').innerHTML = weekData.map(d=>`
+  <div class="bar-wrap">
+    <div class="bar" style="height:${Math.max((d.minutes/maxMins)*140,4)}px">
+      ${d.minutes>0?`<div class="bar-val">${d.minutes}m</div>`:''}
+    </div>
+    <div class="bar-label">${d.label}</div>
+  </div>`).join('');
+
+// Pie chart
+const canvas = document.getElementById('pieCanvas');
+const ctx = canvas.getContext('2d');
+const mastered = {{ mastered_cards }};
+const total = {{ total_cards }};
+const unmastered = total - mastered;
+if(total===0){
+  ctx.fillStyle='#1e2738'; ctx.beginPath(); ctx.arc(60,60,50,0,Math.PI*2); ctx.fill();
+} else {
+  const segs = [{val:mastered,color:'#5eead4'},{val:unmastered,color:'#a78bfa'}];
+  let start = -Math.PI/2;
+  segs.forEach(s=>{
+    const slice = (s.val/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(60,60);
+    ctx.arc(60,60,50,start,start+slice);
+    ctx.closePath(); ctx.fillStyle=s.color; ctx.fill();
+    start+=slice;
+  });
+}
+</script>
+{% endblock %}

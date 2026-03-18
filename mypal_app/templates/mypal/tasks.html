@@ -1,0 +1,91 @@
+{% extends 'mypal/base.html' %}
+{% block title %}Tasks{% endblock %}
+
+{% block extra_css %}
+<style>
+  .tasks-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+  .task-sections { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .col-title { font-size:12px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+  .task-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:10px; display:flex; align-items:flex-start; gap:12px; transition:all .2s; }
+  .task-card:hover { border-color:var(--lavender); }
+  .task-card.done { opacity:0.55; }
+  .task-text { font-size:14px; font-weight:600; flex:1; }
+  .task-text.striked { text-decoration:line-through; color:var(--muted); }
+  .task-date { font-size:11px; color:var(--muted); margin-top:3px; }
+  .task-actions { display:flex; gap:6px; margin-left:auto; align-items:center; }
+  .priority-badge { font-size:11px; font-weight:800; padding:3px 8px; border-radius:20px; }
+  .add-form { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px 20px; margin-bottom:20px; display:none; }
+  .add-form.open { display:block; }
+  .form-row { display:flex; gap:10px; align-items:flex-end; }
+  .form-row .form-input { margin-bottom:0; }
+  .empty-state { color:var(--muted); font-size:13px; text-align:center; padding:24px; border:1px dashed var(--border); border-radius:12px; }
+  @media(max-width:768px) { .task-sections{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-content">
+  <div class="tasks-header">
+    <div class="page-title">✅ Task Board</div>
+    <button class="btn-primary" onclick="document.getElementById('add-form').classList.toggle('open')">+ Add Task</button>
+  </div>
+
+  <!-- ADD FORM -->
+  <div class="add-form" id="add-form">
+    <form method="post" class="form-row">
+      {% csrf_token %}
+      <input type="text" name="text" class="form-input" placeholder="What needs to get done?" style="margin-bottom:0;" required>
+      <select name="priority" class="form-input" style="width:140px;margin-bottom:0;">
+        <option value="high">🔴 High</option>
+        <option value="med" selected>🟠 Medium</option>
+        <option value="low">🟢 Low</option>
+      </select>
+      <button type="submit" class="btn-primary">Add</button>
+      <button type="button" onclick="document.getElementById('add-form').classList.remove('open')" class="btn-danger" style="padding:12px 16px;">Cancel</button>
+    </form>
+  </div>
+
+  <div class="task-sections">
+    <!-- TODO -->
+    <div>
+      <div class="col-title">📌 Todo ({{ todo_tasks.count }})</div>
+      {% for task in todo_tasks %}
+      <div class="task-card">
+        <div>
+          <div class="task-text">
+            {% if task.priority == 'high' %}🔴{% elif task.priority == 'med' %}🟠{% else %}🟢{% endif %}
+            {{ task.text }}
+          </div>
+          <div class="task-date">{{ task.created_at|date:"M d, Y" }}</div>
+        </div>
+        <div class="task-actions">
+          <form method="post" action="{% url 'toggle_task' task.id %}">{% csrf_token %}<button type="submit" class="btn-edit">✓ Done</button></form>
+          <form method="post" action="{% url 'delete_task' task.id %}">{% csrf_token %}<button type="submit" class="btn-danger">🗑</button></form>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state">🎉 All done! Add a new task.</div>
+      {% endfor %}
+    </div>
+
+    <!-- DONE -->
+    <div>
+      <div class="col-title">✅ Completed ({{ done_tasks.count }})</div>
+      {% for task in done_tasks %}
+      <div class="task-card done">
+        <div>
+          <div class="task-text striked">{{ task.text }}</div>
+          <div class="task-date">{{ task.created_at|date:"M d, Y" }}</div>
+        </div>
+        <div class="task-actions">
+          <form method="post" action="{% url 'toggle_task' task.id %}">{% csrf_token %}<button type="submit" class="btn-edit">↩ Undo</button></form>
+          <form method="post" action="{% url 'delete_task' task.id %}">{% csrf_token %}<button type="submit" class="btn-danger">🗑</button></form>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state">Nothing completed yet. You've got this! 💪</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

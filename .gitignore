@@ -1,0 +1,12 @@
+# Environment (The most important part to ignore!)
+myenv/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Database (Keep your personal login out of GitHub)
+db.sqlite3
+
+# Mac System Files
+.DS_Store
